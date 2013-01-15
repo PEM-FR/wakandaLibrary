@@ -12,16 +12,36 @@ WAF.onAfterInit = function onAfterInit() {// @lock
 	addFormatAndPrice.click = function addFormatAndPrice_click (event)// @startlock
 	{// @endlock
 		// Create a format first
-		
-		// then a price
-		
+		var idFormat = sources.format.ID,
+			idDocument = sources.document.ID
+		;
+		sources.document_Format.newDocumentFormat({onSuccess: function(event){
+			console.log("event: ", event);
+			sources.document_Format.serverRefresh({forceReload: true});
+			sources.document_Format.autoDispatch();
+			var idLanguage = sources.language.ID,
+				idCurrency = sources.currency.ID,
+				idDocumentFormat = event.result
+			;
+			sources.document_Price.newDocumentPrice({
+				onSuccess: function(rez){
+					sources.document_Format.serverRefresh({forceReload: true});
+					sources.document_Format.autoDispatch();
+					sources.document.serverRefresh({forceReload: true});
+					sources.document.autoDispatch();
+				},
+				onError: function(someError){
+					console.log("an error occured : ", someError);
+				}
+			}, idDocumentFormat, idLanguage, idCurrency);
+		}}, idFormat, idDocument);
 	};// @lock
 
 	var getSelections = function(selection, selectionSource){
 		var container = [];
 		selection.forEach(function(position){
-			sources[selectionSource].getElement(position, {sync: true, onSuccess: function(event){
-				container.push({ID: event.element.ID});	
+			selectionSource.getElement(position, {sync: true, onSuccess: function(event){
+				container.push(event.element.ID);
 			}});
 		});
 		return container;
@@ -35,33 +55,29 @@ WAF.onAfterInit = function onAfterInit() {// @lock
 
 	saveDocument.click = function saveDocument_click (event)// @startlock
 	{// @endlock
-		sources.document.publisher = sources.publisher.query("ID = :1", $$("publisherCombo").getValue(), {
+		// setPublisher
+		console.log("sources.publisher.getCurrentElement() : ", sources.publisher.getCurrentElement());
+		sources.document.save({
 			onSuccess: function(event){
-				var publisher = event.element;
-				sources.document.publisher = publisher;
-				sources.document.save({
+				sources.document.serverRefresh();
+				console.log("event onSave of doc: ", event);
+				// then we save the relationships
+				var publisher = sources.publisher.ID,
+					authors = getSelections($$("docAuthorsGrid").getSelectedRows(), sources.author),
+					keywords = getSelections($$("docKeywordsGrid").getSelectedRows(), sources.keyword)
+				;
+				// addFormat
+				// addLanguage
+				// addAuthor
+				// addKeyword
+				sources.document.getCurrentElement().saveRelations({
 					onSuccess: function(event){
-						var doc = event.result;
-						// then we save the relationships
-						var authors = getSelections($$("docAuthorsGrid").getSelectedRows(), sources.author),
-							keywords = getSelections($$("docKeywordsGrid").getSelectedRows(), sources.keyword)
-						;
-						
-						// setPublisher
-						// addFormat
-						// addLanguage
-						// addAuthor
-						// addKeyword
-						doc.saveRelations({
-							onSuccess: function(event){
-								sources.document.serverRefresh();
-							}
-						}, authors, keywords);
-					},
-					onError: function(event){
+						sources.document.serverRefresh();
 					}
-				});
-			}		
+				}, publisher, authors, keywords);
+			},
+			onError: function(event){
+			}
 		});
 	};// @lock
 
